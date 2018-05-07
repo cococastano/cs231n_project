@@ -64,7 +64,6 @@ for subdir, dirs, files in os.walk(master_dir):
         elif tags[-1] == 'nobreak':
             my_key = tags[-1] + str(nobreak_count)
             nobreak_count += 1
-        print(my_key)
         
         while ret:
             
