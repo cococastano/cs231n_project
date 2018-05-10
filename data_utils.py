@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 import os
 import random
 
@@ -24,14 +25,16 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     """
 
     if video_dir == None:
-        video_dir = 'Video1'
+        video_dir = 'C:/Users/nicas/Documents/' + \
+                    'CS231N-ConvNNImageRecognition/' + \
+                    'Project/droplets_raw_movies'
     
 
     break_files = []
     nobreak_files = []
     # generate list of paths to files in video_dir
     for subdir, dirs, files in os.walk(video_dir):
-        tags = subdir.split('/')
+        tags = subdir.split('\\')
         for file in files:
             file_name = subdir + os.sep + file
             # lets not assume all files found are .avi video files
@@ -56,8 +59,7 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     for i, file in enumerate(break_files + nobreak_files):
         # read video file
         vid = cv2.VideoCapture(file)
-        num_frames = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))
-        tags = file.split('/')
+        tags = file.split('\\')
         if tags[-2] == 'break': 
             my_key = tags[-2] + str(break_count)
             break_count += 1
@@ -66,11 +68,10 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
             my_key = tags[-2] + str(nobreak_count)
             nobreak_count += 1
             # print(my_key)
+        my_frames[my_key] = []
         for i, f in enumerate(frame_range):
-            fr = 1 / num_frames * (f + 1)
-            # set frame 'index' between 0.0 and 1.0 to be decoded
-            
-            vid.set(cv2.CAP_PROP_POS_FRAMES, fr)
+            # set frame index to be decoded
+            vid.set(cv2.CAP_PROP_POS_FRAMES, f)
             ret, frame = vid.read()
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             # check indices for non black and white (gray border)
@@ -82,7 +83,6 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
                 r2 = crop_locs[0][-1] + 1
                 c1 = crop_locs[1][0]
                 c2 = crop_locs[1][-1] + 1
-    
             # crop out the gray border and normalize the array
             frame = frame[r1:r2, c1:c2]
             # expect the pixel values to be 0 or 255 (some max) so...
@@ -100,28 +100,93 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     return my_frames
         
     
-def show_countours(frame, contour_i = -1, resize_frame=1):
+def show_my_countours(frame, contour_i = -1, resize_frame=1, show=True):
     """  
-    Input single channel 8-bit image such as the ones returned by 
-    pull_frame_range and function shows contours. countour_i passes the 
-    countour index to show; default is all contours. resize_frame is a double
-    values to scale the frame.
+    Returns a frame with the contours shown
+    Inputs:
+        frame: single channel 8-bit image such as the ones returned by 
+               pull_frame_range and function shows contours. 
+        countour_i: countour index to show; default -1 is all contours 
+        resize_frame: scalar to scale the frame by 
+        show: True to display from function
     """
     orig_frame = frame
     rgb_frame = cv2.cvtColor(frame,cv2.COLOR_GRAY2RGB)
-    cont_im, my_contours, hier = cv2.findContours(orig_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    frame_conts = cv2.drawContours(rgb_frame, my_contours, -1, (0,255,0), contour_i)
+    cont_im, my_contours, hier = cv2.findContours(orig_frame, cv2.RETR_LIST, 
+                                                  cv2.CHAIN_APPROX_NONE)    
+    frame_conts = cv2.drawContours(rgb_frame, my_contours, 
+                                   contour_i, (0,255,0), 2)
     if resize_frame != 1:
-        row, col = frame.shape
-        r = int(resize_frame*col/frame.shape[1])
-        dim = (resize_frame * col, int(frame.shape[0]*r))
-        resized_frame = cv2.resize(frame_conts,dim,
-                                   interpolation=cv2.INTER_AREA)
-        out_frame = cv2.imshow('contour image', resized_frame)
+        out_frame = resize_my_frame(frame_conts, scale_factor=resize_frame)
     else:
-        out_frame = cv2.imshow('contour image', frame_conts)
-#    cv2.waitKey(0)
+        out_frame = frame_conts
+    if show == True:
+        cv2.imshow('contour image', out_frame)
+    
+    return out_frame
+
+def resize_my_frame(frame, scale_factor = 1):
+    """
+    Scale a given frame but a scale_factor
+    """
+    row, col, _ = frame.shape
+    r = int(scale_factor*col/frame.shape[1])
+    dim = (scale_factor * col, int(frame.shape[0]*r))
+    out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_AREA)
     
     return out_frame
  
+def find_constriction(frame):
+    """
+    Find the x location of the constriction
+    """
+    step = 10
+    n_rows, n_cols = frame.shape
+    top_bound = np.zeros(int(round(n_cols/step+1)))
+    low_bound = np.zeros(int(round(n_cols/step+1)))
+    x_locs = np.zeros(int(round(n_cols/step+1)))
+    for i,i_col in enumerate(range(0,n_cols,step)):
+        my_slice = frame[:,i_col]
+        #boundary has 0 pixel value; store to top and bottom location for an x
+        zero_locs = np.where(my_slice == 0)
+        top_bound[i] = np.min(zero_locs)
+        low_bound[i] = np.max(zero_locs)
+        x_locs[i] = i_col
+    # just remove the last index to avoid runtime errors
+    low_bound = np.delete(low_bound,-1)  
+    top_bound = np.delete(top_bound,-1) 
+    x_locs = np.delete(x_locs,-1) 
+    # to top locations from the smoothed bottom for width of channel
+    diff = savitzky_golay_smooth(low_bound,5,3) - \
+           savitzky_golay_smooth(top_bound,5,3)
+    # look for spike in the difference vector for constriction location
+    deriv = np.gradient(diff)
+    deriv2 = np.gradient(deriv)
+    max_deriv2_i = np.argmax(deriv2)
+    const_x_loc = x_locs[max_deriv2_i]
+        
+    return int(const_x_loc)
       
+def savitzky_golay_smooth(y, window_size, order, deriv=0, rate=1):
+    from math import factorial
+    try:
+        window_size = np.abs(np.int(window_size))
+        order = np.abs(np.int(order))
+    except ValueError:
+        raise ValueError("window_size and order have to be of type int")
+    if window_size % 2 != 1 or window_size < 1:
+        raise TypeError("window_size size must be a positive odd number")
+    if window_size < order + 2:
+        raise TypeError("window_size is too small for the polynomials order")
+    order_range = range(order+1)
+    half_window = (window_size -1) // 2
+    # precompute coefficients
+    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+    # pad the signal at the extremes with
+    # values taken from the signal itself
+    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
+    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+    y = np.concatenate((firstvals, y, lastvals))
+    
+    return np.convolve( m[::-1], y, mode='valid')
