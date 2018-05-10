@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import random
+import math
 
 def pull_frame_range(frame_range = [3], video_dir=None, num_break=None, 
                      num_nobreak=None, save_option=False):
@@ -112,7 +113,7 @@ def show_my_countours(frame, contour_i = -1, resize_frame=1, show=True):
     """
     orig_frame = frame
     rgb_frame = cv2.cvtColor(frame,cv2.COLOR_GRAY2RGB)
-    cont_im, my_contours, hier = cv2.findContours(orig_frame, cv2.RETR_LIST, 
+    _, my_contours, _ = cv2.findContours(orig_frame, cv2.RETR_LIST, 
                                                   cv2.CHAIN_APPROX_NONE)    
     frame_conts = cv2.drawContours(rgb_frame, my_contours, 
                                    contour_i, (0,255,0), 2)
@@ -168,21 +169,24 @@ def find_constriction(frame):
     return int(const_x_loc)
       
 def savitzky_golay_smooth(y, window_size, order, deriv=0, rate=1):
-    from math import factorial
+    """
+    Smoothing function
+    """
     try:
         window_size = np.abs(np.int(window_size))
         order = np.abs(np.int(order))
     except ValueError:
-        raise ValueError("window_size and order have to be of type int")
+        raise ValueError('window_size and order have to be of type int')
     if window_size % 2 != 1 or window_size < 1:
-        raise TypeError("window_size size must be a positive odd number")
+        raise TypeError('window_size size must be a positive odd number')
     if window_size < order + 2:
-        raise TypeError("window_size is too small for the polynomials order")
+        raise TypeError('window_size is too small for the polynomials order')
     order_range = range(order+1)
     half_window = (window_size -1) // 2
     # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
-    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+    b = np.mat([[k**i for i in order_range] for k in range(-half_window, 
+                half_window+1)])
+    m = np.linalg.pinv(b).A[deriv] * rate**deriv * math.factorial(deriv)
     # pad the signal at the extremes with
     # values taken from the signal itself
     firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
@@ -190,3 +194,25 @@ def savitzky_golay_smooth(y, window_size, order, deriv=0, rate=1):
     y = np.concatenate((firstvals, y, lastvals))
     
     return np.convolve( m[::-1], y, mode='valid')
+
+def polygon_vert_sort(corners):
+    """
+    Sort polygon vertices in counter clockwise order for correct shoelace 
+    area formula implementation
+    """
+    # calculate centroid of the polygon
+    n = len(corners) # of corners
+    cx = float(sum(x for x, y in corners)) / n
+    cy = float(sum(y for x, y in corners)) / n
+    # create a new list of corners which includes angles
+    corners_with_angles = []
+    for x, y in corners:
+        an = (math.atan2(y - cy, x - cx) + 2.0 * math.pi) % (2.0 * math.pi)
+        corners_with_angles.append((x, y, an))
+    # sort it using the angles
+    corners_with_angles.sort(key=lambda x: x[2])
+    out = [(x, y) for x, y, a in corners_with_angles]
+    # return the sorted corners w/ angles removed
+#    return_val = [() for ]
+#    return_val = map(lambda (x, y, an): (x, y), corners_with_angles)
+    return out
