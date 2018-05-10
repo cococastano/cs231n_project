@@ -2,4 +2,4 @@
 CS231N project code
 
 
-Please replace "\" to "//" for Windows system
+Please replace "\\" to "//" for Windows system
