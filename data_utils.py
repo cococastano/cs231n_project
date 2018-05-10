@@ -24,16 +24,14 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     """
 
     if video_dir == None:
-        video_dir = 'C:/Users/nicas/Documents/' + \
-                    'CS231N-ConvNNImageRecognition/' + \
-                    'Project/droplets_raw_movies'
+        video_dir = 'Video1'
     
 
     break_files = []
     nobreak_files = []
     # generate list of paths to files in video_dir
     for subdir, dirs, files in os.walk(video_dir):
-        tags = subdir.split('\\')
+        tags = subdir.split('/')
         for file in files:
             file_name = subdir + os.sep + file
             # lets not assume all files found are .avi video files
@@ -59,7 +57,7 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
         # read video file
         vid = cv2.VideoCapture(file)
         num_frames = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))
-        tags = file.split('\\')
+        tags = file.split('/')
         if tags[-2] == 'break': 
             my_key = tags[-2] + str(break_count)
             break_count += 1
@@ -102,39 +100,27 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     return my_frames
         
     
-def show_my_countours(frame, contour_i = -1, resize_frame=1, show=True):
+def show_countours(frame, contour_i = -1, resize_frame=1):
     """  
-    Returns a frame with the contours shown
-    Inputs:
-        frame: single channel 8-bit image such as the ones returned by 
-               pull_frame_range and function shows contours. 
-        countour_i: countour index to show; default -1 is all contours 
-        resize_frame: scalar to scale the frame by 
-        show: True to display from function
+    Input single channel 8-bit image such as the ones returned by 
+    pull_frame_range and function shows contours. countour_i passes the 
+    countour index to show; default is all contours. resize_frame is a double
+    values to scale the frame.
     """
     orig_frame = frame
     rgb_frame = cv2.cvtColor(frame,cv2.COLOR_GRAY2RGB)
-    cont_im, my_contours, hier = cv2.findContours(orig_frame, cv2.RETR_LIST, 
-                                                  cv2.CHAIN_APPROX_NONE)    
-    frame_conts = cv2.drawContours(rgb_frame, my_contours, 
-                                   contour_i, (0,255,0), 2)
+    cont_im, my_contours, hier = cv2.findContours(orig_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    frame_conts = cv2.drawContours(rgb_frame, my_contours, -1, (0,255,0), contour_i)
     if resize_frame != 1:
-        out_frame = resize_my_frame(frame_conts, scale_factor=resize_frame)
+        row, col = frame.shape
+        r = int(resize_frame*col/frame.shape[1])
+        dim = (resize_frame * col, int(frame.shape[0]*r))
+        resized_frame = cv2.resize(frame_conts,dim,
+                                   interpolation=cv2.INTER_AREA)
+        out_frame = cv2.imshow('contour image', resized_frame)
     else:
-        out_frame = frame_conts
-    if show == True:
-        cv2.imshow('contour image', out_frame)
-    
-    return out_frame
-
-def resize_my_frame(frame, scale_factor = 1):
-    """
-    Scale a given frame but a scale_factor
-    """
-    row, col, _ = frame.shape
-    r = int(scale_factor*col/frame.shape[1])
-    dim = (scale_factor * col, int(frame.shape[0]*r))
-    out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_AREA)
+        out_frame = cv2.imshow('contour image', frame_conts)
+#    cv2.waitKey(0)
     
     return out_frame
  
