@@ -102,29 +102,39 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     return my_frames
         
     
-def show_countours(frame, contour_i = -1, resize_frame=1):
+def show_my_countours(frame, contour_i = -1, resize_frame=1, show=True):
     """  
-    Input single channel 8-bit image such as the ones returned by 
-    pull_frame_range and function shows contours. countour_i passes the 
-    countour index to show; default is all contours. resize_frame is a double
-    values to scale the frame.
+    Returns a frame with the contours shown
+    Inputs:
+        frame: single channel 8-bit image such as the ones returned by 
+               pull_frame_range and function shows contours. 
+        countour_i: countour index to show; default -1 is all contours 
+        resize_frame: scalar to scale the frame by 
+        show: True to display from function
     """
     orig_frame = frame
     rgb_frame = cv2.cvtColor(frame,cv2.COLOR_GRAY2RGB)
     cont_im, my_contours, hier = cv2.findContours(orig_frame, cv2.RETR_LIST, 
                                                   cv2.CHAIN_APPROX_NONE)    
     frame_conts = cv2.drawContours(rgb_frame, my_contours, 
-                                   -1, (0,255,0), contour_i)
+                                   contour_i, (0,255,0), 2)
     if resize_frame != 1:
-        row, col = frame.shape
-        r = int(resize_frame*col/frame.shape[1])
-        dim = (resize_frame * col, int(frame.shape[0]*r))
-        resized_frame = cv2.resize(frame_conts,dim,
-                                   interpolation=cv2.INTER_AREA)
-        out_frame = cv2.imshow('contour image', resized_frame)
+        out_frame = resize_my_frame(frame_conts, scale_factor=resize_frame)
     else:
-        out_frame = cv2.imshow('contour image', frame_conts)
-#    cv2.waitKey(0)
+        out_frame = frame_conts
+    if show == True:
+        cv2.imshow('contour image', out_frame)
+    
+    return out_frame
+
+def resize_my_frame(frame, scale_factor = 1):
+    """
+    Scale a given frame but a scale_factor
+    """
+    row, col, _ = frame.shape
+    r = int(scale_factor*col/frame.shape[1])
+    dim = (scale_factor * col, int(frame.shape[0]*r))
+    out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_AREA)
     
     return out_frame
  
