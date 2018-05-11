@@ -61,12 +61,13 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
         # read video file
         vid = cv2.VideoCapture(file)
         tags = file.split('\\')
+        LEO = tags[-1].split('_')[1]
         if tags[-2] == 'break': 
-            my_key = tags[-2] + str(break_count)
+            my_key = tags[-2] + str(break_count) + '_LEO_' + LEO
             break_count += 1
             # print(my_key)
         elif tags[-2] == 'nobreak':
-            my_key = tags[-2] + str(nobreak_count)
+            my_key = tags[-2] + str(nobreak_count) + '_LEO_' + LEO
             nobreak_count += 1
             # print(my_key)
         my_frames[my_key] = []
