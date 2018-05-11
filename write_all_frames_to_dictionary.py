@@ -32,7 +32,8 @@ master_dir: directory with video subdirectories and files, for example:
 If you want to open and pull from some 'set', move it into master_dir
 """
 
-master_dir = 'Video1'
+master_dir = 'C:/Users/nicas/Documents/CS231N-ConvNNImageRecognition/' + \
+             'Project/droplets_raw_movies'
 
 
 # dictionary to hold frames with keys break1, nobreak1, break2, etc.
@@ -43,7 +44,7 @@ nobreak_count = 0
 
 for subdir, dirs, files in os.walk(master_dir):
     vid_count = 0
-    tags = subdir.split('/')
+    tags = subdir.split('\\')
     if vid_count != 0: print('%d videos read in subdir %s' 
                              % (vid_count, tags[-2:]))
     # loop over all files below master directory (only touches files not dirs)
@@ -75,7 +76,9 @@ for subdir, dirs, files in os.walk(master_dir):
                 
                 # check indices for non black and white (gray border)
                 if frame_count == 1:
-                    crop_locs = np.where((np.logical_or(frame == np.amin(frame), frame == np.amax(frame))))
+                    crop_locs = \
+                        np.where((np.logical_or(frame == np.amin(frame),
+                                                 frame == np.amax(frame))))
                     r1 = crop_locs[0][0]
                     r2 = crop_locs[0][-1] + 1
                     c1 = crop_locs[1][0]
@@ -103,9 +106,10 @@ for subdir, dirs, files in os.walk(master_dir):
     
     # end of looping over directories in droplets_raw_movies
 print('total number of videos read: %d' % (total_vid_count))
-print('%d break videos, %d no break videos' % (break_count, nobreak_count))
-
+print('%d break videos, %d no break videos' % (break_count, 
+                                                  nobreak_count))
+    
 # saving dictionary (this is a very large file)
-print('saving dictionary')
-np.save('my_frames.npy', my_frames)
+# print('saving dictionary')
+# np.save('my_frames.npy', my_frames)
 # dummy = np.load('my_frames.npy')
