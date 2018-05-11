@@ -1,9 +1,69 @@
+import extract_features
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 import random
 import math
+
+def get_data(num_train=1000, num_validation=200, num_test=100,
+             feature_list=['LEO','area','angle']):
+    
+    # load data
+    my_frames = pull_frame_range(frame_range=[3])
+    # construct X matrix and y vector
+    n_features = len(feature_list)
+    X_data = np.zeros((len(my_frames), n_features))
+    y_data = np.zeros((len(my_frames), 1))
+    for i, key in enumerate(my_frames):
+        frame = my_frames[key][0]
+        LEO = key.split('LEO_')[-1]
+        centroids = extract_features.get_n_leading_droplets_centroids(frame, 
+                                                                      n=3)
+        area = extract_features.polygon_area(centroids=centroids)
+        leading_angle = extract_features.leading_angle(centroids=centroids)
+        
+        X_data[i,0] = LEO
+        X_data[i,1] = area
+        X_data[i,2] = leading_angle
+        
+        # classify a break as 0 and nobreak as 1
+        my_class = key.split('_')[0]
+        
+        if 'nobreak' in my_class:
+            y_data[i] = 1
+        else:
+            y_data[i] = 0
+    
+    mask_train = list(range(0, num_train))
+    mask_val = list(range(num_train, num_train + num_validation))
+    mask_test = list(range(num_train + num_validation, 
+                           num_train + num_validation + num_test))
+    m = len(y_data)
+    rand_i = [i for i in range(m)]
+    rand_i = np.random.permutation(np.array(rand_i))
+    X_data = X_data[rand_i,:]
+    y_data = y_data[rand_i,:]
+    # train set
+    X_train = X_data[mask_train]
+    y_train = y_data[mask_train]
+    # validation set
+    X_val = X_data[mask_val]
+    y_val = y_data[mask_val]
+    # test set
+    X_test = X_data[mask_test]
+    y_test = y_data[mask_test]
+    # normalize the data: subtract the mean image
+    mean_feats = np.mean(X_train, axis=0)
+    X_train -= mean_feats
+    X_val -= mean_feats
+    X_test -= mean_feats
+    # reshape data to rows
+    X_train = X_train.reshape(num_train, -1)
+    X_val = X_val.reshape(num_validation, -1)
+    X_test = X_test.reshape(num_test, -1)
+    
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
 def pull_frame_range(frame_range = [3], video_dir=None, num_break=None, 
                      num_nobreak=None, save_option=False):
