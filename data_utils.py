@@ -29,7 +29,7 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     if video_dir == None:
         video_dir = 'C:/Users/nicas/Documents/' + \
                     'CS231N-ConvNNImageRecognition/' + \
-                    'Project/droplets_raw_movies'
+                    'Project/datasets'
     
 
     break_files = []
@@ -53,7 +53,6 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
                                 len(break_files))[:num_break]
     nobreak_files = random.sample(nobreak_files, 
                                   len(nobreak_files))[:num_nobreak]
-    
     # loop over randomized and cut lists of file names
     my_frames = {}
     break_count = 0
@@ -103,36 +102,61 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     return my_frames
 
 def get_data(num_train=1000, num_validation=200, num_test=100,
-             feature_list=['LEO','area','angle']):
+             feature_list=['LEO','area','angle'], reshape_frames=False):
+    """
+    Get data. If feature list is None, raw image data will be returned
+    (i.e. pixels values) as vectors of reshaped data. Set reshape _frames 
+    option to True to produces matrix with each row being a frame's pixel
+    values.
+    """
     
     import extract_features
 
     # load data
     my_frames = pull_frame_range(frame_range=[3])
     # construct X matrix and y vector
-    n_features = len(feature_list)
-    X_data = np.zeros((len(my_frames), n_features))
-    y_data = np.zeros((len(my_frames), 1))
+    try:
+        n_features = len(feature_list)
+        X_data = np.zeros((len(my_frames), n_features))
+        y_data = np.zeros((len(my_frames), 1))
+    except:
+        dum_key = list(my_frames.keys())
+        dum_key = dum_key[0]
+        dummy = my_frames[dum_key][0]
+        y_data = np.zeros((len(my_frames), 1))
+        if reshape_frames is True:
+            X_data = np.zeros((len(my_frames), dummy.shape[0]*dummy.shape[1]))
+        elif reshape_frames is False:
+            # one color channel for grayscale
+            X_data = np.zeros((len(my_frames), 1,
+                               dummy.shape[0], dummy.shape[1]))
     for i, key in enumerate(my_frames):
         frame = my_frames[key][0]
-        LEO = key.split('LEO_')[-1]
-        centroids = extract_features.get_n_leading_droplets_centroids(frame, 
-                                                                      n=3)
-        area = extract_features.polygon_area(centroids=centroids)
-        leading_angle = extract_features.leading_angle(centroids=centroids)
+        if feature_list != None:
+            LEO = key.split('LEO_')[-1]
+            centroids, _ = extract_features.\
+                           get_n_leading_droplets_centroids(frame, n=3)
+            area = extract_features.polygon_area(centroids=centroids)
+            leading_angle = extract_features.leading_angle(centroids=centroids)
         
-        X_data[i,0] = LEO
-        X_data[i,1] = area
-        X_data[i,2] = leading_angle
-        
+            X_data[i,0] = LEO
+            X_data[i,1] = area
+            X_data[i,2] = leading_angle
+        else:
+            if reshape_frames is True:
+                X_data[i,:] = np.reshape(frame, -1)
+            elif reshape_frames is False:
+                X_data[i,0,:,:] = frame
+            
         # classify a break as 0 and nobreak as 1
         my_class = key.split('_')[0]
         
         if 'nobreak' in my_class:
-            y_data[i] = 1
+            y_data[i] = int(1)
         else:
-            y_data[i] = 0
+            y_data[i] = int(0)
     
+    # make masks for partitioning data sets
     mask_train = list(range(0, num_train))
     mask_val = list(range(num_train, num_train + num_validation))
     mask_test = list(range(num_train + num_validation, 
@@ -140,59 +164,87 @@ def get_data(num_train=1000, num_validation=200, num_test=100,
     m = len(y_data)
     rand_i = [i for i in range(m)]
     rand_i = np.random.permutation(np.array(rand_i))
-    X_data = X_data[rand_i,:]
-    y_data = y_data[rand_i,:]
-    # train set
-    X_train = X_data[mask_train]
+    # partition based on type of output X
+    if reshape_frames is True:
+        X_data = X_data[rand_i,:]
+        # train set
+        X_train = X_data[mask_train]
+        # validation set
+        X_val = X_data[mask_val]
+        # test set
+        X_test = X_data[mask_test]
+#        # normalize the data: subtract the mean image
+#        mean_feats = np.mean(X_train, axis=0)
+#        X_train -= mean_feats
+#        X_val -= mean_feats
+#        X_test -= mean_feats
+        # reshape data to rows
+        X_train = X_train.reshape(num_train, -1)
+        X_val = X_val.reshape(num_validation, -1)
+        X_test = X_test.reshape(num_test, -1)
+    elif reshape_frames is False:
+        X_data = X_data[rand_i,:,:,:]
+        # train set
+        X_train = X_data[mask_train,:,:,:]
+        # validation set
+        X_val = X_data[mask_val,:,:,:]
+        # test set
+        X_test = X_data[mask_test,:,:,:]
+        # normalize the data: subtract the mean image
+#        mean_feats = np.mean(X_train, axis=0)
+#        X_train -= mean_feats
+#        X_val -= mean_feats
+#        X_test -= mean_feats
+    
+    # and the targets vector y
+    y_data = y_data = y_data[rand_i,:]
     y_train = y_data[mask_train]
-    # validation set
-    X_val = X_data[mask_val]
     y_val = y_data[mask_val]
-    # test set
-    X_test = X_data[mask_test]
     y_test = y_data[mask_test]
-    # normalize the data: subtract the mean image
-    mean_feats = np.mean(X_train, axis=0)
-    X_train -= mean_feats
-    X_val -= mean_feats
-    X_test -= mean_feats
-    # reshape data to rows
-    X_train = X_train.reshape(num_train, -1)
-    X_val = X_val.reshape(num_validation, -1)
-    X_test = X_test.reshape(num_test, -1)
     
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 
     
-def show_my_countours(frame, contour_i = -1, resize_frame=1, show=True):
+def show_my_countours(frame, contours = -1, resize_frame=1, show=True):
     """  
     Returns a frame with the contours shown
     Inputs:
         frame: single channel 8-bit image such as the ones returned by 
                pull_frame_range and function shows contours. 
-        countour_i: countour index to show; default -1 is all contours 
+        countours: dictionary of contours to draw; default -1 is all contours 
         resize_frame: scalar to scale the frame by 
         show: True to display from function
     """
     orig_frame = frame
     rgb_frame = cv2.cvtColor(frame,cv2.COLOR_GRAY2RGB)
-    _, my_contours, _ = cv2.findContours(orig_frame, cv2.RETR_LIST, 
-                                                  cv2.CHAIN_APPROX_NONE)    
-    frame_conts = cv2.drawContours(rgb_frame, my_contours, 
-                                   contour_i, (0,255,0), 2)
+        
+    if contours == -1:
+        _, my_contours, _ = cv2.findContours(orig_frame, cv2.RETR_LIST, 
+                                             cv2.CHAIN_APPROX_NONE)
+        frame_conts = cv2.drawContours(rgb_frame, my_contours, 
+                                       contours, (0,255,0), 2)
+    else:
+        try:
+            contours = list(contours.values())
+        except:
+            contours = [contours]
+        for cont in contours:
+            frame_conts = cv2.drawContours(rgb_frame, [cont], 
+                                           0, (0,255,0), 2)
     if resize_frame != 1:
         out_frame = resize_my_frame(frame_conts, scale_factor=resize_frame)
     else:
         out_frame = frame_conts
     if show == True:
         cv2.imshow('contour image', out_frame)
+        cv2.waitKey(500)
     
     return out_frame
 
 def resize_my_frame(frame, scale_factor = 1):
     """
-    Scale a given frame but a scale_factor
+    Scale a given frame by a scale_factor
     """
     row, col, _ = frame.shape
     r = int(scale_factor*col/frame.shape[1])

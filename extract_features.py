@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 import os
 import random
+import matplotlib.pyplot as plt
+from matplotlib.animation import FFMpegWriter
 
 
 def get_correct_contours(frame):
@@ -123,7 +125,7 @@ def leading_angle(centroids):
 
 def configuration_energy(frame, n=3):
     """ 
-    Return the energy associated witha configuration of n drops left of the 
+    Return the energy associated with a configuration of n drops left of the 
     constriction
     """
     # hardcode conversion from pixels to microns
@@ -153,7 +155,7 @@ def configuration_energy(frame, n=3):
 
 def configuration_energy_v2(frame, n=3):
     """ 
-    Return the energy associated witha configuration of n drops left of the 
+    Return the energy associated with a configuration of n drops left of the 
     constriction
     """
     # hardcode conversion from pixels to microns
@@ -193,77 +195,89 @@ def configuration_energy_v2(frame, n=3):
         
     return energy
 
-#######################################
+def mean_deformation(frame, n=3):
+    """ 
+    Return the mean energy associated with a configuration of n drops left 
+    of the constriction
+    """
+    # collect n centroids and contours left of constriction
+    _ , contours = get_n_leading_droplets_centroids(frame, n)
+    contour_list = list(contours.values())
+    
+    mean_deformation = 0
+    for cont in contour_list:
+        perim = cv2.arcLength(cont,True)
+        area = cv2.contourArea(cont)
+        mean_deformation += perim / (2 * np.sqrt(np.pi*area))
+        
+    mean_deformation = mean_deformation/n
+    return mean_deformation
 
-##### test code ####
-## make a video
-#
-#test_frame = data_utils.pull_frame_range(frame_range=[3],
-#                                         num_break=1, num_nobreak=1)
-#test_frame = test_frame[list(test_frame.keys())[0]][0]
-#width = test_frame.shape[0]
-#height = test_frame.shape[1]
-##fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-##video = cv2.VideoWriter('all_frames_mark_up.avi', fourcc,10,(width*2,height*2))
-##video = cv2.VideoWriter('all_frames_mark_up.avi',-1,20,(width*2,height*2))
-#
-#n = 3  # number of vertices of polygon to interrogate
-#frame_range = [i for i in range(0,21)]
-#frames = data_utils.pull_frame_range(frame_range=frame_range,#frame_range,
-#                                     num_break=5, num_nobreak=5)
-## do some plotting to verify what we've got so far
-#for frame_key in frames:
-#    for i, frame in enumerate(frames[frame_key]):      
-#        # add contours to show_frame
-#        show_frame = data_utils.show_my_countours(frame,contour_i=-1,
-#                                                  resize_frame=1,show=False)
-#        # add centroids to show_frame
-#        centroids, _ = get_droplets_centroids(frame)
-#        for c in centroids:
-#            cX = centroids[c][0]
-#            cY = centroids[c][1]
-#            cv2.circle(show_frame, (cX,cY), 1, (0,0,255), 7)
-#            cv2.putText(show_frame, str(c), (cX + 4, cY - 4),
-#                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-#        # add polygon with n vertices to show_frame
-#        leading_centroids, _ = get_n_leading_droplets_centroids(frame,n)
-#        print('area: ', polygon_area(leading_centroids), '\t angle: ', 
-#              leading_angle(leading_centroids)*180/np.pi,
-#              '\t frame key: ', frame_key)
-#        leading_centroids = [(coord) for coord in leading_centroids.values()]
-#        leading_centroids.append(leading_centroids[0])
-#        leading_centroids = np.int32(np.array(leading_centroids))        
-#        cv2.polylines(show_frame, [leading_centroids], True, (255,60,255))
-#        # add constriction location to show_frame
-#        constric_loc = data_utils.find_constriction(frame)
-#        y1 = int(frame.shape[0]/3)
-#        y2 = int(frame.shape[0]/3*2)
-#        cv2.line(show_frame, (constric_loc, y1), 
-#                 (constric_loc, y2), (0,150,255), 2)
-#        frame_str = frame_key.split('_')[0]
-#        frame_str = frame_key + ', frame ' + str(i)
-#        # add frame label to show_frame
-#        show_frame = cv2.putText(show_frame, frame_str, 
-#                                 (show_frame.shape[1]-250,
-#                                 show_frame.shape[0]-10),
-#                                 cv2.FONT_HERSHEY_COMPLEX, 
-#                                 0.5, (0, 0, 0), 2)
-#        # resize show_frame
-#        show_frame = data_utils.resize_my_frame(frame=show_frame,
-#                                                scale_factor=2)
-#        # show show_frame
-#        # video.write(show_frame)
-#        cv2.imshow('mark up', show_frame)
-#        cv2.waitKey(700)
+def sum_perimeters(frame, n=3):
+    """ 
+    Return the mean energy associated with a configuration of n drops left 
+    of the constriction
+    """
+    # collect n centroids and contours left of constriction
+    _ , contours = get_n_leading_droplets_centroids(frame, n)
+    contour_list = list(contours.values())
+    
+    perim_sum = 0
+    for cont in contour_list:
+        perim_sum += cv2.arcLength(cont,True)
+        
+    return perim_sum
 
-#video.release()
-##       
-test_frame = data_utils.pull_frame_range(frame_range=[3])
-test_frame = test_frame[list(test_frame.keys())[0]][0]
+def outer_perimeter(frame, return_frame=False, n=3):
+    """ 
+    Return the sum of the perimeters of the n drops left of the constriction
+    """
+    # collect n centroids and contours left of constriction
+    _ , contours = get_n_leading_droplets_centroids(frame, n)
+    contour_list = list(contours.values())
+    # make dummy frame for superimpose contour onto
+    blk_im = np.ones((frame.shape[0],frame.shape[1],3),np.uint8)
+    # draw contours of interest on dummy frame
+    for cont in contour_list:
+        blk_im = cv2.drawContours(blk_im,[cont],0,(0,255,0),-1)
+    # make kernels for dilating/eroding and closing
+    kernel_dil = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(11,11))
+    # dilate image
+    dil_im = cv2.dilate(blk_im, kernel_dil, iterations=1)
+    # close image
+    close_im = cv2.morphologyEx(dil_im, cv2.MORPH_CLOSE, kernel_close)
+    # erode initial dilating
+    erod_im = cv2.erode(close_im, kernel_dil, iterations=1)
+    
+    # get contour of processed droplets
+    temp_im = cv2.cvtColor(erod_im, cv2.COLOR_BGR2GRAY)
+    _, temp_im = cv2.threshold(temp_im,127,255,0)
+    _, my_contours, _ = cv2.findContours(temp_im, cv2.RETR_LIST, 
+                                         cv2.CHAIN_APPROX_NONE)
+    # if multiple contours add perimeters
+    total_perim = 0
+    if len(my_contours) > 1:
+        for cont in my_contours:
+            total_perim += cv2.arcLength(cont,True)
+    else:
+        total_perim = cv2.arcLength(my_contours[0],True)
 
-leading_centroids, _ = get_n_leading_droplets_centroids(test_frame, n=3)
-dummy = leading_angle(leading_centroids)
-energy = configuration_energy(test_frame)
+    
+    # check if return markedup frame wanted
+    if return_frame == False:
+        out_im = None
+    else:
+        blk_out_im = np.ones((frame.shape[0],frame.shape[1],3),np.uint8)
+        final_cont_im = cv2.drawContours(blk_out_im,my_contours,-1,
+                                         (0,0,255),-1)
+        alpha = 0.7
+        cont_im = data_utils.show_my_countours(frame,contours=contours,
+                                               show=False)
+        out_im = cv2.addWeighted(final_cont_im, alpha, cont_im, 1 - alpha, 0)
+    
+    return (total_perim, out_im)
+
 
         
     
