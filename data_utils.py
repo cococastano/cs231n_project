@@ -7,7 +7,7 @@ import math
 
 
 def pull_frame_range(frame_range = [3], video_dir=None, num_break=None, 
-                     num_nobreak=None, save_option=False):
+                     num_nobreak=None, save_option=False, add_flip=True):
     """
     Returns a dictionary with break or nobreak keys for the 4th frame (by 
     default) or a list of a range of frames. There is built in randomness in 
@@ -20,6 +20,8 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     num_nobreak: number of nobreak videos ranges desired; None retrieves all
         nobreak videos that are available
     save_option: save dictionaries to current directory if True
+    add_flip: True to double the data set by providing a refelcted frame
+        too that is effectively the same
     
     example function call                
     my_frames = pull_frame_range(frame_range=[2,3,4], num_break=9, 
@@ -30,7 +32,6 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
         video_dir = 'C:/Users/nicas/Documents/' + \
                     'CS231N-ConvNNImageRecognition/' + \
                     'Project/datasets'
-    
 
     break_files = []
     nobreak_files = []
@@ -53,6 +54,7 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
                                 len(break_files))[:num_break]
     nobreak_files = random.sample(nobreak_files, 
                                   len(nobreak_files))[:num_nobreak]
+    # print(len(nobreak_files) + len(break_files))
     # loop over randomized and cut lists of file names
     my_frames = {}
     break_count = 0
@@ -65,11 +67,9 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
         if tags[-2] == 'break': 
             my_key = tags[-2] + str(break_count) + '_LEO_' + LEO
             break_count += 1
-            # print(my_key)
         elif tags[-2] == 'nobreak':
             my_key = tags[-2] + str(nobreak_count) + '_LEO_' + LEO
             nobreak_count += 1
-            # print(my_key)
         my_frames[my_key] = []
         for i, f in enumerate(frame_range):
             # set frame index to be decoded
@@ -96,66 +96,89 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
             except:
                 # except initializing a new list under a key (frame 1)
                 my_frames[my_key] = [frame]
+            if add_flip is True: 
+                flipped_frame = cv2.flip(frame,0)
+                my_frames[my_key].append(flipped_frame)
         
         vid.release()
     
     return my_frames
 
-def get_data(num_train=1000, num_validation=200, num_test=100,
-             feature_list=['LEO','area','angle'], reshape_frames=False):
+def get_data(num_train=2168, num_validation=400, num_test=200,
+             feature_list=['LEO','area','angle'], reshape_frames=False,
+             add_flip=True):
     """
     Get data. If feature list is None, raw image data will be returned
-    (i.e. pixels values) as vectors of reshaped data. Set reshape _frames 
+    (i.e. pixels values) as vectors of reshaped data. Set reshape_frames 
     option to True to produces matrix with each row being a frame's pixel
     values.
+    
+    add_flip: True to double the data set by providing a refelcted frame
+        too that is effectively the same (passed to pull_frame_range method)
+    
+    NOTE: this is not set up to pull frames from a range for raw image 
+        processing; this will extract one frame (with its flipped version if
+        specified) across all videos
     """
     
     import extract_features
 
     # load data
-    my_frames = pull_frame_range(frame_range=[3])
+    my_frames = pull_frame_range(frame_range=[3], add_flip=add_flip)
+    # if add_flip is true you expect at twice as many frames
+    if add_flip is True: 
+        mult_fact = 2
+    else:
+        mult_fact = 1
     # construct X matrix and y vector
     try:
         n_features = len(feature_list)
-        X_data = np.zeros((len(my_frames), n_features))
-        y_data = np.zeros((len(my_frames), 1))
+        X_data = np.zeros((len(my_frames)*mult_fact, n_features))
+        y_data = np.zeros((len(my_frames)*mult_fact, 1))
     except:
         dum_key = list(my_frames.keys())
         dum_key = dum_key[0]
         dummy = my_frames[dum_key][0]
-        y_data = np.zeros((len(my_frames), 1))
+        y_data = np.zeros((len(my_frames)*mult_fact, 1))
+        
         if reshape_frames is True:
-            X_data = np.zeros((len(my_frames), dummy.shape[0]*dummy.shape[1]))
+            X_data = np.zeros((len(my_frames)*mult_fact, 
+                               dummy.shape[0]*dummy.shape[1]))
         elif reshape_frames is False:
             # one color channel for grayscale
-            X_data = np.zeros((len(my_frames), 1,
+            X_data = np.zeros((len(my_frames)*mult_fact, 1,
                                dummy.shape[0], dummy.shape[1]))
-    for i, key in enumerate(my_frames):
-        frame = my_frames[key][0]
-        if feature_list != None:
-            LEO = key.split('LEO_')[-1]
-            centroids, _ = extract_features.\
-                           get_n_leading_droplets_centroids(frame, n=3)
-            area = extract_features.polygon_area(centroids=centroids)
-            leading_angle = extract_features.leading_angle(centroids=centroids)
-        
-            X_data[i,0] = LEO
-            X_data[i,1] = area
-            X_data[i,2] = leading_angle
-        else:
-            if reshape_frames is True:
-                X_data[i,:] = np.reshape(frame, -1)
-            elif reshape_frames is False:
-                X_data[i,0,:,:] = frame
-            
-        # classify a break as 0 and nobreak as 1
-        my_class = key.split('_')[0]
-        
-        if 'nobreak' in my_class:
-            y_data[i] = int(1)
-        else:
-            y_data[i] = int(0)
     
+    for i, key in zip(range(0, mult_fact*len(my_frames)+1, 2), 
+                      my_frames.keys()):
+        for f, frame in enumerate(my_frames[key]):
+            # note this will end up just taking features from the last frame
+            # in the range!
+            if feature_list != None:
+                LEO = key.split('LEO_')[-1]
+                centroids, _ = extract_features.\
+                               get_n_leading_droplets_centroids(frame, n=3)
+                area = extract_features.polygon_area(centroids=centroids)
+                leading_angle = \
+                    extract_features.leading_angle(centroids=centroids)
+            
+                X_data[i+f,0] = LEO
+                X_data[i+f,1] = area
+                X_data[i+f,2] = leading_angle
+            else:
+                if reshape_frames is True:
+                    X_data[i+f,:] = np.reshape(frame, -1)
+                elif reshape_frames is False:
+                    X_data[i+f,0,:,:] = frame
+                
+            # classify a break as 0 and nobreak as 1
+            my_class = key.split('_')[0]
+            
+            if 'nobreak' in my_class:
+                y_data[i+f] = int(1)
+            else:
+                y_data[i+f] = int(0)
+                    
     # make masks for partitioning data sets
     mask_train = list(range(0, num_train))
     mask_val = list(range(num_train, num_train + num_validation))
@@ -173,11 +196,6 @@ def get_data(num_train=1000, num_validation=200, num_test=100,
         X_val = X_data[mask_val]
         # test set
         X_test = X_data[mask_test]
-#        # normalize the data: subtract the mean image
-#        mean_feats = np.mean(X_train, axis=0)
-#        X_train -= mean_feats
-#        X_val -= mean_feats
-#        X_test -= mean_feats
         # reshape data to rows
         X_train = X_train.reshape(num_train, -1)
         X_val = X_val.reshape(num_validation, -1)
@@ -190,11 +208,6 @@ def get_data(num_train=1000, num_validation=200, num_test=100,
         X_val = X_data[mask_val,:,:,:]
         # test set
         X_test = X_data[mask_test,:,:,:]
-        # normalize the data: subtract the mean image
-#        mean_feats = np.mean(X_train, axis=0)
-#        X_train -= mean_feats
-#        X_val -= mean_feats
-#        X_test -= mean_feats
     
     # and the targets vector y
     y_data = y_data = y_data[rand_i,:]
