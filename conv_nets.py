@@ -378,7 +378,7 @@ n = 4
 locs = np.concatenate((break_locs[0:n],nobreak_locs[0:n]))
 X = loader_train.dataset.tensors[0][locs,:,:,:]
 y = loader_train.dataset.tensors[1][locs]
-show_saliency_maps(X, ym model_2)
+show_saliency_maps(X, y, model_2)
 
 # save the model if its good!
 torch.save(model_2, 'C:/Users/nicas/Documents/CS231N-ConvNNImageRecognition/' + \
