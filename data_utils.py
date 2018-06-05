@@ -217,7 +217,78 @@ def get_data(num_train=2168, num_validation=400, num_test=200,
     
     return X_train, y_train, X_val, y_val, X_test, y_test
 
-
+def get_opt_flow_data(num_train=3300, num_validation=300, num_test=188,
+                      opt_flow_frame_dir = None):
+    """
+    Relies on apriori use of mean_opt_flow script to extract mean optical 
+    frames that will be read in using this method. No flipped version is 
+    supplied, this should be done using the script to write optical flow 
+    frames.
+    """
+    if opt_flow_frame_dir is None:
+        opt_flow_frame_dir = 'C:/Users/nicas/Documents/' +\
+                             'CS231N-ConvNNImageRecognition/Project/' +\
+                             'opt_flow_datasets/first_six_frames_average' 
+    
+    break_files = []
+    nobreak_files = []
+    for subdir, dirs, files in os.walk(opt_flow_frame_dir):
+        for file in files:
+            file_name = subdir + os.sep + file
+            # lets not assume all files found are .avi video files
+            if 'break' and '.png' in file: 
+                break_files.append(file_name)
+            elif 'nobreak' and '.png' in file:
+                nobreak_files.append(file_name)
+    # dummy to get info on frame size
+    dummy = cv2.imread(break_files[0], cv2.IMREAD_COLOR)
+    # randomize all files in list
+    files = random.sample(break_files + nobreak_files, 
+                          len(break_files + nobreak_files))
+    # 3 color channels
+    X_data = np.zeros((len(files), dummy.shape[0], dummy.shape[1], 3))
+    y_data = np.zeros((len(files), 1))
+    mean_r = 0
+    mean_g = 0
+    mean_b = 0
+    ims = []
+    for i, file in enumerate(files):
+        tags = file.split('\\')
+        flow_field = cv2.imread(file, cv2.IMREAD_COLOR)
+        flow_field = np.asarray(flow_field)
+        ims.append(flow_field)
+        if 'nobreak' in tags[-1]:
+            y_data[i] = int(1)
+        else:
+            y_data[i] = int(0)
+    X_data = np.array(ims, dtype='uint8')
+                    
+    # swap axes
+    X_data = np.swapaxes(X_data,1,3)
+    X_data = np.swapaxes(X_data,2,3)
+    # make masks for partitioning data sets
+    mask_train = list(range(0, num_train))
+    mask_val = list(range(num_train, num_train + num_validation))
+    mask_test = list(range(num_train + num_validation, 
+                           num_train + num_validation + num_test))
+    m = len(y_data)
+    rand_i = [i for i in range(m)]
+    rand_i = np.random.permutation(np.array(rand_i))
+    # randomize again
+    X_data = X_data[rand_i,:,:,:]
+    # train set
+    X_train = X_data[mask_train,:,:,:]
+    # validation set
+    X_val = X_data[mask_val,:,:,:]
+    # test set
+    X_test = X_data[mask_test,:,:,:]
+    # and the targets vector y
+    y_data = y_data = y_data[rand_i,:]
+    y_train = y_data[mask_train]
+    y_val = y_data[mask_val]
+    y_test = y_data[mask_test]
+    
+    return X_train, y_train, X_val, y_val, X_test, y_test
     
 def show_my_countours(frame, contours = -1, resize_frame=1, show=True):
     """  
@@ -259,12 +330,28 @@ def resize_my_frame(frame, scale_factor = 1):
     """
     Scale a given frame by a scale_factor
     """
-    row, col, _ = frame.shape
-    r = int(scale_factor*col/frame.shape[1])
-    dim = (scale_factor * col, int(frame.shape[0]*r))
-    out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_AREA)
+    try:
+        row, col, _ = frame.shape
+    except:
+        row, col = frame.shape
+    dim = (int(scale_factor * col), int(frame.shape[0]*scale_factor))
+    if scale_factor > 1:
+        out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_LINEAR)
+    else:
+        out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_AREA)
     
     return out_frame
+
+def crop_my_frame(frame,crop_locs):
+    """
+    Crop frame by list of crop_locs: [left_loc, right_loc, top_loc, bottom_loc]
+    """
+    r1 = crop_locs[2]
+    r2 = crop_locs[3]
+    c1 = crop_locs[0]
+    c2 = crop_locs[1]
+    frame = frame[r1:r2, c1:c2]
+    return frame
  
 def find_constriction(frame):
     """
