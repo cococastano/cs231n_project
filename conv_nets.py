@@ -7,6 +7,7 @@ import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
 import torchvision.transforms as T
+import cv2
 
 
 # will we be using GPUs?
@@ -29,9 +30,9 @@ plt.close('all')
 
 # load data
 class_names = ['no break', 'break']  # 0 is no break and 1 is break
-num_train = 2400 # 100
-num_val = 218 # 50
-num_test = 150
+num_train = 100#3400 # 100
+num_val = 20#218 # 50
+num_test = 10#150
 (X_train, y_train, 
  X_val, y_val, X_test, y_test) = data_utils.get_data(num_train=num_train,
                                                      num_validation=num_val,
@@ -215,13 +216,16 @@ def show_saliency_maps(X, y, model):
     for i in range(N):
         X_show = X[i].reshape((176,288))
         plt.subplot(2, N, i + 1)
-        plt.imshow(X_show)
+#        plt.imshow(X_show)
+        plt.imshow(data_utils.resize_my_frame(X_show,scale_factor=3))
         plt.axis('off')
         plt.title(class_names[int(y[i])])
         plt.subplot(2, N, N + i + 1)
-        plt.imshow(saliency[i], cmap=plt.cm.hot)
+#        plt.imshow(saliency[i], cmap=plt.cm.hot)
+        plt.imshow(data_utils.resize_my_frame(saliency[i], scale_factor=3), 
+                   cmap=plt.cm.hot)
         plt.axis('off')
-        plt.gcf().set_size_inches(12, 5)
+        plt.gcf().set_size_inches(15, 8)
     plt.show()
 
 
@@ -317,6 +321,61 @@ class SixLayerConvWithPooling(nn.Module):
         
         return scores
     
+class SixLayerConvWithPoolingDummy(nn.Module):
+    def __init__(self, in_channel, channel_1, channel_2, channel_3,
+                 channel_4, num_classes):
+        super().__init__()
+        # initialize 2D conv layer 1
+        self.c2d_1 = nn.Conv2d(in_channel, channel_1, kernel_size=7, stride=1,
+                               padding=3)
+        # initialize 2D conv layer 2
+        self.c2d_2 = nn.Conv2d(channel_1, channel_2, kernel_size=5, stride=1,
+                               padding=2)
+        # initialize maxpool
+        self.maxpool2d_1 = nn.MaxPool2d(kernel_size=2)
+        # initialize 2D conv layer 3
+        self.c2d_3 = nn.Conv2d(channel_2, channel_3, kernel_size=3, stride=1,
+                               padding=1)
+        # initialize 2D conv layer 4
+        self.c2d_4 = nn.Conv2d(channel_3, channel_4, kernel_size=3, stride=1,
+                               padding=1)
+        # initialize maxpool
+        self.maxpool2d_2 = nn.MaxPool2d(kernel_size=2)
+        # initialize fully connected layers of 2D conv layers
+        self.fc_1 = nn.Linear(channel_4*im_h*im_w/16, 100)
+        self.fc_2 = nn.Linear(100, num_classes)
+        
+    def forward(self,x):
+        # forward pass for 2*(conv -> relu -> conv -> relu -> pool) -> fc ->
+        # relu -> fc
+        x = F.relu(self.c2d_1(x))
+        print(x.shape)
+        x = F.relu(self.c2d_2(x))
+        print(x.shape)
+        x = self.maxpool2d_1(x)
+        print(x.shape)
+        x = F.relu(self.c2d_3(x))
+        print(x.shape)
+        x = F.relu(self.c2d_4(x))
+        cv2.waitKey(10000)
+        print(x.shape)
+        x = self.maxpool2d_2(x)
+        print(x.shape)
+        dummy = x
+        dummy = dummy.detach().numpy()
+        dummy = dummy[0,3,:,:]
+        dummy = np.reshape(dummy,(44,72))
+        cv2.imshow('activation layer afterpool 4_3',dummy)     
+        x = flatten(x)
+        print(x.shape)
+        x = self.fc_1(x)
+        print(x.shape)
+        x = F.relu(x)
+        print(x.shape)
+        scores = self.fc_2(x)
+        
+        return scores
+    
 #def test_ThreeLayerConvNet():
 #    x = torch.zeros((23, 1, 176, 288), dtype=dtype)
 #    model = ThreeLayerConvNet(in_channel=1, channel_1=32, channel_2=16, 
@@ -345,7 +404,7 @@ class SixLayerConvWithPooling(nn.Module):
 #### intialize parameters of 6 layer ConvNet
 learning_rate = 3e-4  # 3e-4 gave max of almost 97% on val, 
 channel_1, channel_2, channel_3, channel_4= 32, 16, 8, 4
-model_2 =  SixLayerConvWithPooling(in_channel=1, channel_1=channel_1,
+model_2 =  SixLayerConvWithPoolingDummy(in_channel=1, channel_1=channel_1,
                              channel_2=channel_2, channel_3=channel_3,
                              channel_4=channel_4, num_classes=2)
 # optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
@@ -374,15 +433,15 @@ nobreak_locs = (loader_train.dataset.tensors[1] == 1).nonzero()[:,0]
 break_locs = (loader_train.dataset.tensors[1] == 0).nonzero()[:,0]
 nobreak_locs = np.random.permutation(np.array(nobreak_locs))
 break_locs = np.random.permutation(np.array(break_locs))
-n = 4
+n = 5
 locs = np.concatenate((break_locs[0:n],nobreak_locs[0:n]))
 X = loader_train.dataset.tensors[0][locs,:,:,:]
 y = loader_train.dataset.tensors[1][locs]
-show_saliency_maps(X, y, model_2)
+show_saliency_maps(X, y, my_model)
 
 # save the model if its good!
 torch.save(model_2, 'C:/Users/nicas/Documents/CS231N-ConvNNImageRecognition/' + \
-           'Project/adam_6layer_conv_pooling_3epochs.pt')
+           'Project/adam_3layer_conv_BN_3epochs.pt')
 my_model = torch.load('C:/Users/nicas/Documents/CS231N-ConvNNImageRecognition/' + \
-           'Project/adam_6layer_conv_pooling_3epochs.pt')
+           'Project/adam_6layer_conv_maxpool_3epochs_op_flow.pt')
 

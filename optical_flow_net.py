@@ -336,31 +336,31 @@ class SixLayerConvWithPooling(nn.Module):
 ################################## SCRIPT #####################################
 
 ##### intialize parameters of 3-layer ConvNet
-#learning_rate = 1e-3  # 1e-3 gave max of 97.25% on val, 
-#channel_1, channel_2, channel_3= 32, 16, 8
-#
-#model_1 = ThreeLayerConvWithBN(in_channel=3, channel_1=channel_1,
-#                             channel_2=channel_2, num_classes=2)
-## optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
-#optimizer = optim.Adam(model_1.parameters(), lr=learning_rate)
-#loss_history, val_acc_history, train_acc_history = \
-#    train_model(model_1, optimizer, epochs=3, return_history=True)
-#        
-#check_accuracy(loader_test, model_1, training=False, print_out=True)
+learning_rate = 1e-3  # 1e-3 gave max of 97.25% on val, 
+channel_1, channel_2, channel_3= 32, 16, 8
+
+model_1 = ThreeLayerConvWithBN(in_channel=3, channel_1=channel_1,
+                             channel_2=channel_2, num_classes=2)
+# optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+optimizer = optim.Adam(model_1.parameters(), lr=learning_rate)
+loss_history, val_acc_history, train_acc_history = \
+    train_model(model_1, optimizer, epochs=2, return_history=True)
+        
+check_accuracy(loader_test, model_1, training=False, print_out=True)
 # 97.87% accuracy on test set
     
 #### intialize parameters of 6 layer ConvNet
-learning_rate = 1e-3  # 3e-4 gave max of almost 97% on val, 
-channel_1, channel_2, channel_3, channel_4= 32, 16, 8, 4
-model_2 =  SixLayerConvWithPooling(in_channel=3, channel_1=channel_1,
-                             channel_2=channel_2, channel_3=channel_3,
-                             channel_4=channel_4, num_classes=2)
-# optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
-optimizer = optim.Adam(model_2.parameters(), lr=learning_rate)
-loss_history, val_acc_history, train_acc_history = \
-    train_model(model_2, optimizer, epochs=3, return_history=True)
-    
-check_accuracy(loader_test, model_2, training=False, print_out=True)
+#learning_rate = 1e-3  # 3e-4 gave max of almost 97% on val, 
+#channel_1, channel_2, channel_3, channel_4= 32, 16, 8, 4
+#model_2 =  SixLayerConvWithPooling(in_channel=3, channel_1=channel_1,
+#                             channel_2=channel_2, channel_3=channel_3,
+#                             channel_4=channel_4, num_classes=2)
+## optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+#optimizer = optim.Adam(model_2.parameters(), lr=learning_rate)
+#loss_history, val_acc_history, train_acc_history = \
+#    train_model(model_2, optimizer, epochs=3, return_history=True)
+#    
+#check_accuracy(loader_test, model_2, training=False, print_out=True)
 ## 99% accuracy on test set
     
 plt.subplot(2,1,1)
@@ -381,16 +381,16 @@ nobreak_locs = (loader_train.dataset.tensors[1] == 1).nonzero()[:,0]
 break_locs = (loader_train.dataset.tensors[1] == 0).nonzero()[:,0]
 nobreak_locs = np.random.permutation(np.array(nobreak_locs))
 break_locs = np.random.permutation(np.array(break_locs))
-n = 4
+n = 5
 locs = np.concatenate((break_locs[0:n],nobreak_locs[0:n]))
 X = loader_train.dataset.tensors[0][locs,:,:,:]
 y = loader_train.dataset.tensors[1][locs]
-show_saliency_maps(X, y, my_model)
+show_saliency_maps(X, y, model_1)
 
 # save the model if its good!
 torch.save(model_2, 'C:/Users/nicas/Documents/' + \
            'CS231N-ConvNNImageRecognition/' + \
-           'Project/adam_6layer_conv_maxpool_3epochs_op_flow.pt')
+           'Project/adam_3layer_conv_BN_3epochs_op_flow.pt')
 my_model = torch.load('C:/Users/nicas/Documents/' + \
                       'CS231N-ConvNNImageRecognition/' + \
                       'Project/adam_3layer_conv_BN_3epochs_op_flow.pt')
