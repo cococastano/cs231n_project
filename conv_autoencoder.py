@@ -248,9 +248,9 @@ if os.path.isfile(model_file) is False:
     frame_range = np.random.permutation(np.array(frame_range))
     part_frame_range = list(chunks(frame_range,part_num))
     num_classes = len(class_names)
-    num_train = 320*part_num # 3400
-    num_val = 160*part_num # 200
-    num_test = 32*part_num # 188
+    num_train = 3000*part_num # 3400
+    num_val = 200*part_num # 200
+    num_test = 188*part_num # 188
     
     # store all history
     loss_history = []
