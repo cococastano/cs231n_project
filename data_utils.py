@@ -8,7 +8,7 @@ import math
 
 def pull_frame_range(frame_range = [3], video_dir=None, num_break=None, 
                      num_nobreak=None, save_option=False, add_flip=True,
-                     crop_at_constr=False):
+                     crop_at_constr=False, blur_im=False):
     """
     Returns a dictionary with break or nobreak keys for the 4th frame (by 
     default) or a list of a range of frames. There is built in randomness in 
@@ -92,7 +92,9 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
             # crop at constriction if option is on
             if crop_at_constr is True:
                 constr_loc = find_constriction(frame)  # 120 for last set
-                frame = crop_my_frame(frame,[0,constr_loc+5,0,frame.shape[0]])
+                frame = crop_my_frame(frame,[0,constr_loc+4,0,frame.shape[0]])
+            if blur_im is True:
+                frame = cv2.blur(frame,(3,3))
             # expect the pixel values to be 0 or 255 (some max) so...
             frame = np.uint8(frame)
             # append frame to dictionary under respective key
@@ -112,7 +114,7 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
 
 def get_data(frame_range=[3], num_train=2168, num_validation=400, num_test=200,
              feature_list=['LEO','area','angle'], reshape_frames=False,
-             add_flip=True, crop_at_constr=False):
+             add_flip=True, crop_at_constr=False, blur_im=False):
     """
     Get data. If feature list is None, raw image data will be returned
     (i.e. pixels values) as vectors of reshaped data. Set reshape_frames 
@@ -142,13 +144,15 @@ def get_data(frame_range=[3], num_train=2168, num_validation=400, num_test=200,
                                      num_break=num_break,
                                      num_nobreak=num_nobreak,
                                      add_flip=add_flip, 
-                                     crop_at_constr=crop_at_constr)
+                                     crop_at_constr=crop_at_constr,
+                                     blur_im=blur_im)
     except:
         my_frames = pull_frame_range(frame_range=frame_range, 
                                      num_break=None,
                                      num_nobreak=None,
                                      add_flip=add_flip, 
-                                     crop_at_constr=crop_at_constr)
+                                     crop_at_constr=crop_at_constr,
+                                     blur_im=blur_im)
         
     # if add_flip is true you expect at twice as many frames
     # frames_per_sample used for correct indexing of out arrays
@@ -239,7 +243,8 @@ def get_data(frame_range=[3], num_train=2168, num_validation=400, num_test=200,
         X_test = X_data[mask_test,:,:,:]
     
     # and the targets vector y
-    y_data = y_data = y_data[rand_i,:]
+    y_data = y_data[rand_i,:]
+#    y_data = y_data = y_data[rand_i,:]
     y_train = y_data[mask_train]
     y_val = y_data[mask_val]
     y_test = y_data[mask_test]
