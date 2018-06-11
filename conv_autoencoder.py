@@ -12,6 +12,12 @@ from torchvision import transforms
 from torchvision.utils import save_image
 
 ############################## CLASSES AND METHODS ############################
+def flatten(x):
+    # read in N, C, H, W
+    N = x.shape[0]
+    # flatten the the C * H * W images into a single vector per image
+    return x.view(N, -1)
+
 def chunks(l, n):
     """yield successive n-sized chunks from l"""
     for i in range(0, len(l), n):
@@ -89,7 +95,7 @@ def train_model(model, optimizer, epochs=1, sub=1, return_history=False):
             # update the parameters of the model using the gradients computed 
             # by the backwards pass
             optimizer.step()
-            if t % 50 == 0:
+            if t % 10 == 0:
                 print('iteration %d of %d, loss = %.4f' % (t, 
                                                            len(train_loader),
                                                            loss.item()))
@@ -142,6 +148,8 @@ class autoencoder(nn.Module):
                                                   
         # encode to n dims
         self.num_dims = num_dims
+        # self.conv_to_dims_2d_1 = 
+        # self.maxpool_to dims_2 = 
         self.fc_1_encode = nn.Linear(87*61*channel_2,500)
         self.fc_2_encode = nn.Linear(500,100)
         self.fc_3_encode = nn.Linear(100,n_dims)
@@ -177,10 +185,8 @@ class autoencoder(nn.Module):
         return out
     
     def encode_to_n_dims(self,x,n):
-        x = F.relu(self.conv_2d_1(x))
-        x = self.maxpool_1(x)
-        x = F.relu(self.conv_2d_2(x))
-        x = self.maxpool_2(x)
+        x = self.encode(x)
+        x = flatten(x)
         x = self.fc_1_encode(x)
         x = self.fc_2_encode(x)
         if n is self.num_dims:
@@ -195,7 +201,7 @@ class autoencoder(nn.Module):
 # make user provide model name to save to avoid overwriting if it exists 
 # already! (mostly for me)
 print('give model name:')
-model_name = 'auto_encode_v0'#input()
+model_name = 'auto_encode_v1'#input()
 model_file = 'C:/Users/nicas/Documents/CS231N-ConvNNImageRecognition/' + \
              'Project/' + model_name + '.pt'
 
@@ -242,9 +248,9 @@ if os.path.isfile(model_file) is False:
     frame_range = np.random.permutation(np.array(frame_range))
     part_frame_range = list(chunks(frame_range,part_num))
     num_classes = len(class_names)
-    num_train = 1500*part_num # 3400
-    num_val = 100*part_num # 200
-    num_test = 50*part_num # 188
+    num_train = 320*part_num # 3400
+    num_val = 160*part_num # 200
+    num_test = 32*part_num # 188
     
     # store all history
     loss_history = []
@@ -315,5 +321,3 @@ if os.path.isfile(model_file) is False:
     # save the model if its good!
     torch.save(model, model_file)
         
-    
-torch.save(model.state_dict(), './conv_autoencoder.pth')
